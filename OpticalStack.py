@@ -11,29 +11,35 @@ class OpticalStack:
         '''
         Initializes the OpticalStack, given the wavelength in nm. Normal incidence by default.
         '''
-        self.n_list = np.array([1])       # list of complex refractive indices n, from top to bottom
+        self.n_list = np.array([1], dtype=complex)       # list of complex refractive indices n, from top to bottom
                                 # the vacuum layer with n=1 is already included
 
         self.d_list = [0]       # list of layer thicknesses. The vacuum layer and substrate layer
                                 # have thickness = 0 by default.
 
-        self.angles = np.array([[0, 0]])  # list of [Faraday, Kerr] angles (in μrad) associated with each layer, from top to
-                                # bottom
+        self.VBs = [0]  # list of Verdet constant times magnetic field, VB, from top to bottom layer
+                                  # in units of μrad/mm
+
+        self.conductivities = np.array([0], dtype=complex)  # list of longitudinal and Hall conductivities of
+                                                            # each layer, in units of e^2/hbar (1/137)
 
         self.wavelength = wavelength        # wavelength in nm
         self.incident_angle = incident_angle        # incident angle, in deg
     
         return
 
-    def insert_layer(self, n, d, phi_F=0+0j, phi_K=0+0j):
+    def insert_layer(self, n, d, VB=0, sigma_xx=0+0j, sigma_xy=0+0j):
         '''
-        Inserts a layer with complex refractive index n, thickness d (in nm), and optional Faraday angle phi_F (in 
-        μrad) and Kerr angle phi_K (in μrad). IMPORTANT: the substrate layer has to be manually inserted
-        with thickness = 0 at last. Complex numbers are entered as a+bj.
+        Inserts a layer with complex refractive index n, thickness d (in nm), and optional Verdet constant
+        times magnetic field (VB, in units of μrad/mm) and conductivities (in units of e^2/hbar). 
+        IMPORTANT: the substrate layer has to be manually inserted with thickness = 0 at last. 
+        Complex numbers are entered as a+bj.
         '''
         self.n_list = np.append(self.n_list, np.array([n]))
         self.d_list.append(d)
-        self.angles = np.append(self.angles, [[phi_F, phi_K]])
+        self.VBs.append(VB)
+        self.conductivities = np.append(self.conductivities, np.array([sigma_xx, sigma_xy], dtype=complex))
+
         return 0
     
     def generate_M_normal(self):
@@ -75,9 +81,9 @@ class OpticalStack:
     
     def compute_v(self):
         '''
-        Computes the field vector v = M^-1 * w. MUST be called AFTER calling
-        the generate_M_normal() function. The total reflection coefficient is then v[1] / v[0].
+        Computes the field vector v = M^-1 * w. The total reflection coefficient is then v[1] / v[0].
         '''
+        self.generate_M_normal()
         self.v = np.matmul(inv(self.M), self.w)
 
         return self.v
