@@ -52,14 +52,39 @@ def VB_test(VB, d, wavel=1550):
     print("RCP (1, -i): ", vector_r)
     print("where the second term should be {}".format(-1 * np.exp(1j * (dyna_phase - theta_F))))
 
-    return
+
+def compute_twisted_stack(n_bscco, n_SiO2, n_Si, d1, d2, d_SiO2, sigma_xx, sigma_xy):
+    '''
+    Computes the phase accumulated for LCP and RCP light upon reflection off of a
+    air-bscco1-bscco2(twisted)-SiO2-Si stack.
+    sigma_xx refers to the optical conductivity (in unit of Ω^-1*cm^-1) of BSCCO, and sigma_xy refers
+    to the optical Hall conductance (in unit of e^2/hbar = 1/137) of the twisted interface.
+    '''
+    # 1e^2/hbar = 2.4316e-4 Ω^-1
+    def build_stack(stack):
+        '''
+        Builds the air-bscco1-bscco2-SiO2-Si optical stack.
+        '''
+        assert isinstance(stack, OpticalStack)
+        stack.insert_layer(n=n_bscco, d=d1, sigma_xx=sigma_xx * d1 * 1e-7 / 2.4316e-4)
+        stack.insert_layer(n=n_bscco, d=3.2, sigma_xx=sigma_xx * 3.2 * 1e-7 / 2.4316e-4, sigma_xy=sigma_xy)
+        stack.insert_layer(n=n_bscco, d=d2, sigma_xx=sigma_xx * d2 * 1e-7 / 2.4316e-4)
+        stack.insert_layer(n=n_SiO2, d=d_SiO2)
+        stack.insert_layer(n=n_Si, d=0)
+        return stack
+    
+    lcp_stack = build_stack(OpticalStack(wavelength=1550, initial_state=0))
+    rcp_stack = build_stack(OpticalStack(wavelength=1550, initial_state=1))
+    lcp_vector = lcp_stack.compute_v()[:2]
+    rcp_vector = rcp_stack.compute_v()[:2]
+    return lcp_vector, rcp_vector
 
 def main():
     '''
     The main function to be run.
     '''
     # monolayer_test(1+0.01j)
-    VB_test(VB=1000, d=10e+6)
+    VB_test(VB=376.2, d=7e+7)
     return 0
 
 
