@@ -21,15 +21,15 @@ class OpticalStack:
         self.VBs = [0]  # list of Verdet constant times magnetic field, VB, from top to bottom layer
                                   # in units of μrad/mm = 1e-12rad/nm
 
-        self.conductivities = np.array([0, 0], dtype=complex)  # list of longitudinal and Hall conductivities of
-                                                            # each layer, in units of e^2/hbar (1/137)
+        self.bottom_sigmas = np.array([0, 0], dtype=complex)  # list of longitudinal and Hall conductivities of
+                                                            # each layer on the **bottom surface**, in units of e^2/hbar (1/137)
 
         self.wavelength = wavelength        # wavelength in nm
         self.initial_state = initial_state        # initial state. 0 for (1, i) and 1 for (1, -i).
     
         return
 
-    def insert_layer(self, n, d, VB=0, sigma_xx=0+0j, sigma_xy=0+0j):
+    def insert_layer(self, n, d, VB=0, bottom_sigma_xx=0+0j, bottom_sigma_xy=0+0j):
         '''
         Inserts a layer with complex refractive index n, thickness d (in nm), and optional Verdet constant
         times magnetic field (VB, in units of μrad/mm) and conductivities (in units of e^2/hbar). 
@@ -39,7 +39,7 @@ class OpticalStack:
         self.n_list = np.append(self.n_list, np.array([n]))
         self.d_list.append(d)
         self.VBs.append(VB * 1e-12)
-        self.conductivities = np.vstack((self.conductivities, np.array([sigma_xx, sigma_xy], dtype=complex) / 137))
+        self.bottom_sigmas = np.vstack((self.bottom_sigmas, np.array([bottom_sigma_xx, bottom_sigma_xy], dtype=complex) / 137))
 
         return 0
     
@@ -62,15 +62,15 @@ class OpticalStack:
         polarization = (-1) ** self.initial_state       # +1 for (1, i), -1 for (1, -i)
         for i in range(N + 1):
             n_i, n_i1 = self.n_list[i], self.n_list[i+1]
-            sigmas_i, sigmas_i1 = self.conductivities[i], self.conductivities[i+1]
+            sigmas_i = self.bottom_sigmas[i]
             VB_i1 = self.VBs[i+1]       # VB of the (i+1)th layer, 
 
             # to compute reflection coefficients r_i_i1 and r_i1_i
             # r_i_i1 = (self.n_list[i] - self.n_list[i+1]) / (self.n_list[i] + self.n_list[i+1])      # r_i_i+1
             # r_i1_i = -1 * r_i_i1                                                      # r_i+1_i
-            r_i_i1_xx = 1.0 / ((n_i + n_i1 + 4*np.pi*sigmas_i1[0])**2 + (4*np.pi*sigmas_i1[1])**2)
-            r_i_i1_xy = r_i_i1_xx * (-8*np.pi*n_i*sigmas_i1[1])
-            r_i_i1_xx *= n_i**2 - (n_i1 + 4*np.pi*sigmas_i1[0])**2 - (4*np.pi*sigmas_i1[1])**2
+            r_i_i1_xx = 1.0 / ((n_i + n_i1 + 4*np.pi*sigmas_i[0])**2 + (4*np.pi*sigmas_i[1])**2)
+            r_i_i1_xy = r_i_i1_xx * (-8*np.pi*n_i*sigmas_i[1])
+            r_i_i1_xx *= n_i**2 - (n_i1 + 4*np.pi*sigmas_i[0])**2 - (4*np.pi*sigmas_i[1])**2
             r_i_i1 = r_i_i1_xx + polarization * 1j * r_i_i1_xy      # r_i_i+1 = r_xx +- ir_xy
 
             r_i1_i_xx = 1.0 / ((n_i1 + n_i + 4*np.pi*sigmas_i[0])**2 + (4*np.pi*sigmas_i[1])**2)
@@ -82,9 +82,9 @@ class OpticalStack:
             # to compute transmission coefficients t_i_i1 and t_i1_i
             # t_i_i1 = 2 * self.n_list[i] / (self.n_list[i] + self.n_list[i+1])         # t_i_i+1
             # t_i1_i = 2 * self.n_list[i+1] / (self.n_list[i] + self.n_list[i+1])       # t_i+1_i
-            t_i_i1_xx = 1.0 / ((n_i + n_i1 + 4*np.pi*sigmas_i1[0])**2 + (4*np.pi*sigmas_i1[1])**2)
+            t_i_i1_xx = 1.0 / ((n_i + n_i1 + 4*np.pi*sigmas_i[0])**2 + (4*np.pi*sigmas_i[1])**2)
             t_i_i1_xy = r_i_i1_xy
-            t_i_i1_xx *= 2 * n_i * (n_i + n_i1 + 4*np.pi*sigmas_i1[0])
+            t_i_i1_xx *= 2 * n_i * (n_i + n_i1 + 4*np.pi*sigmas_i[0])
             t_i_i1 = t_i_i1_xx + polarization * 1j * t_i_i1_xy
 
             t_i1_i_xx = 1.0 / ((n_i1 + n_i + 4*np.pi*sigmas_i[0])**2 + (4*np.pi*sigmas_i[1])**2)
