@@ -125,12 +125,24 @@ def investigate_mod_dependence():
     Investigates the modulation parameter dependence of 1fx/y and 2fr.
     '''
     # The parameter space is [phi_m, omega_m, tau, phi_nr, delta_tau, delta_phase, A_mode1_x, A_mode1_y, A_mode2_x, A_mode2_y]
-    def pow2phim(mod_power):
+    def pow2phim(mod_power, mod_freq):
         '''
-        Converts RF power to modulation depth phi_m, assuming 0.16rad/Vrms ratio measured in our lab (phi_m=0.92rad for RF power 25.3dBm) and 50Ohm
-        output impedance.
+        Converts RF power to modulation depth phi_m, assuming 0.16rad/Vrms ratio measured in our lab (phi_m=0.92rad for RF power 25.3dBm) and using
+        the factory-measured reflectance spectrum.
         '''
-        return 0.16 * np.sqrt(2) * np.sqrt(50 * 1e-3 * 10**(mod_power / 10))
+        omega = 2 * np.pi * mod_freq * 1e3
+        omega_0 = 2 * np.pi * 35033e3
+        omega_plus = 2 * np.pi * 35207e3
+        omega_minus = 2 * np.pi * 34860e3
+        Z_0 = 50
+        C = (omega_plus**2 / omega_0**2 - 1) / (2 * Z_0 * omega_plus)
+        L = 1 / (omega_0**2 * C)
+        X = omega*L - 1/(omega*C)       # reactive impedance
+        power_factor = 4*Z_0**2 / (4*Z_0**2 + X**2)
+        P_tot = 1e-3 * 10**(mod_power/10)
+        V_amp = np.sqrt(P_tot * power_factor * (Z_0**2 + X**2) / Z_0)
+
+        return 0.16 * np.sqrt(2) * V_amp
 
     def unit_complex(a, b):
         '''
@@ -149,7 +161,7 @@ def investigate_mod_dependence():
     A_y = 13.6
     for freq in mod_freqs:
         for pow in mod_powers:
-            phi_m = pow2phim(pow) * unit_complex(1, 0.1)
+            phi_m = pow2phim(pow, freq)
             phi_nr = 0
             params = [phi_m, 2*np.pi*freq*1e3, tau, phi_nr, 0, 0, A_x, A_y, 0, 0]
             [V_1fx, V_1fy, V_2fr] = eval_Vs(V_detector_two_modes, params)
@@ -179,6 +191,47 @@ def investigate_mod_dependence():
     return 0
 
 
+def plot_smith():
+    omega_step = 10e3
+    omega_m_vals = 2*np.pi * np.arange(start=34000e3, stop=36000e3, step=omega_step)
+    omega_0 = 2 * np.pi * 35033e3
+    omega_plus = 2 * np.pi * 35207e3
+    omega_minus = 2 * np.pi * 34860e3
+    Z_0 = 50
+    C = (omega_plus**2 / omega_0**2 - 1) / (2 * Z_0 * omega_plus)
+    L = 1 / (omega_0**2 * C)
+    c = 3e8 / 1.5
+    l = 1.6
+    def omega2Gamma(omega):
+        res = 1j * (omega*L - 1/(omega*C)) / (2*Z_0 + 1j * (omega*L-1/(omega*C)))
+        res *= np.exp(-1j * 2*l*omega/c)
+        return res
+    
+    Gammas = []
+    for omega in omega_m_vals:
+        Gammas.append(omega2Gamma(omega))
+    Gammas = np.array(Gammas, dtype=complex)
+
+    Gamma_minus = Gammas[round((omega_minus-omega_m_vals[0])/(2*np.pi*omega_step))]
+    Gamma_0 = Gammas[round((omega_0-omega_m_vals[0])/(2*np.pi*omega_step))]
+    Gamma_plus = Gammas[round((omega_plus-omega_m_vals[0])/(2*np.pi*omega_step))]
+
+    plt.plot(Gammas.real, Gammas.imag, 'b-')
+    plt.scatter(Gamma_minus.real, Gamma_minus.imag, label='M2')
+    plt.scatter(Gamma_0.real, Gamma_0.imag, label='M4')
+    plt.scatter(Gamma_plus.real, Gamma_plus.imag, label='M3')
+
+    plt.plot(np.linspace(-1, 1, 200), np.zeros(200), color='gray', linestyle='dotted')
+    plt.plot(np.zeros(200), np.linspace(-1, 1, 200), color='gray', linestyle='dotted')
+    plt.xlabel("Re(Γ)")
+    plt.ylabel("Im(Γ)")
+    plt.legend()
+    plt.show()
+
+    print("And we have Z_2=({})Ω, Z_4=({})Ω, and Z_3=({})Ω".format(50*(1+Gamma_minus)/(1-Gamma_minus), 50*(1+Gamma_0)/(1-Gamma_0), \
+                                                                            50*(1+Gamma_plus)/(1-Gamma_plus)))
+
+    return 0
 
 
     
@@ -188,3 +241,4 @@ if __name__ == '__main__':
     # The parameter space is [phi_m, omega_m, tau, phi_nr, delta_tau, delta_phase, A_mode1_x, A_mode1_y, A_mode2_x, A_mode2_y]
     # investigate_delta_d()
     investigate_mod_dependence()
+    # plot_smith()
