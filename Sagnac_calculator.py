@@ -125,24 +125,34 @@ def investigate_mod_dependence():
     Investigates the modulation parameter dependence of 1fx/y and 2fr.
     '''
     # The parameter space is [phi_m, omega_m, tau, phi_nr, delta_tau, delta_phase, A_mode1_x, A_mode1_y, A_mode2_x, A_mode2_y]
+    omega_0_factory = 2 * np.pi * 35033e3
+    omega_0 = 2 * np.pi * 35090e+3
+    omega_plus = 2 * np.pi * 35207e3
+    omega_minus = 2 * np.pi * 34860e3
+    Z_0 = 50
+    L_factory = Z_0 / (2*omega_plus) * (omega_plus**2 / omega_0**2 - 1)
+    C = 1 / (omega_0_factory**2 * L_factory)        # assume capacitance of EOM stays the same while tuning the resonance frequency
+    L = 1 / (omega_0**2 * C)
+    # pf = 4*omega_0_factory**2*L**2 / (4*omega_0_factory**2*L**2 + Z_0**2*(omega_0_factory**2/omega_0**2 - 1)**2)
+    # print("The power factor at 35030kHz is {}.".format(pf))
+
     def pow2phim(mod_power, mod_freq):
         '''
         Converts RF power to modulation depth phi_m, assuming 0.16rad/Vrms ratio measured in our lab (phi_m=0.92rad for RF power 25.3dBm) and using
         the factory-measured reflectance spectrum.
         '''
         omega = 2 * np.pi * mod_freq * 1e3
-        omega_0 = 2 * np.pi * 35033e3
-        omega_plus = 2 * np.pi * 35207e3
-        omega_minus = 2 * np.pi * 34860e3
-        Z_0 = 50
-        C = (omega_plus**2 / omega_0**2 - 1) / (2 * Z_0 * omega_plus)
-        L = 1 / (omega_0**2 * C)
-        X = omega*L - 1/(omega*C)       # reactive impedance
-        power_factor = 4*Z_0**2 / (4*Z_0**2 + X**2)
-        P_tot = 1e-3 * 10**(mod_power/10)
-        V_amp = np.sqrt(P_tot * power_factor * (Z_0**2 + X**2) / Z_0)
+        X = omega*C - 1/(omega*L)
+        power_factor = 4*omega**2*L**2 / (4*omega**2*L**2 + Z_0**2*(omega**2/omega_0**2 - 1)**2)
 
-        return 0.16 * np.sqrt(2) * V_amp
+        Z_L = Z_0 / (1 + 1j * Z_0 * X)
+        P_in = 1e-3 * 10**(mod_power / 10)
+
+        V_L = np.sqrt(P_in * power_factor * Z_0)          # voltage across the load
+        # V_c = V_L / (omega*C * np.sqrt(Z_0**2 + X**2))
+        # print(V_L)
+
+        return 0.17 * np.sqrt(2) * V_L
 
     def unit_complex(a, b):
         '''
@@ -157,8 +167,8 @@ def investigate_mod_dependence():
     onefx_theory = []
     onefy_theory = []
     twofr_theory = []
-    A_x = 13.6             # magnitude of A_x should be ~13.6 to agree with experimental values
-    A_y = 13.6
+    A_x = 15             # magnitude of A_x should be ~13.6 to agree with experimental values
+    A_y = 15
     for freq in mod_freqs:
         for pow in mod_powers:
             phi_m = pow2phim(pow, freq)
@@ -198,12 +208,13 @@ def plot_smith():
     omega_plus = 2 * np.pi * 35207e3
     omega_minus = 2 * np.pi * 34860e3
     Z_0 = 50
-    C = (omega_plus**2 / omega_0**2 - 1) / (2 * Z_0 * omega_plus)
-    L = 1 / (omega_0**2 * C)
+    L = Z_0 / (2*omega_plus) * (omega_plus**2 / omega_0**2 - 1)
+    C = 1 / (omega_0**2 * L)
     c = 3e8 / 1.5
-    l = 1.6
+    l = 0.15
     def omega2Gamma(omega):
-        res = 1j * (omega*L - 1/(omega*C)) / (2*Z_0 + 1j * (omega*L-1/(omega*C)))
+        Z_L = Z_0 / (1 + 1j * Z_0 * (omega*C-1/(omega*L)))
+        res = (Z_L-Z_0) / (Z_L+Z_0)
         res *= np.exp(-1j * 2*l*omega/c)
         return res
     
